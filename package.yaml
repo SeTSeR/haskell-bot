@@ -21,7 +21,7 @@ description:         Please see the README on GitHub at <https://github.com/SeTS
 
 dependencies:
 - base >= 4.7 && < 5
-- telegram-api
+- telegram-bot-simple
 
 library:
   source-dirs: src
