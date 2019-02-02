@@ -42,6 +42,5 @@ run token = do
 
 start :: IO ()
 start = do
-    putStrLn "Please, enter Telegram bot's API token:"
-    token <- Token . Text.pack <$> getLine
+    token <- getEnvToken "TELEGRAM_BOT_TOKEN"
     run token
