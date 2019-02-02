@@ -1,0 +1,1 @@
+web: haskell-bot-exe
