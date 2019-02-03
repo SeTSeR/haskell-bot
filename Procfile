@@ -1,1 +1,1 @@
-web: haskell-bot-exe
+worker: haskell-bot-exe
