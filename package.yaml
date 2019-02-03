@@ -22,6 +22,9 @@ description:         Please see the README on GitHub at <https://github.com/SeTS
 dependencies:
 - base >= 4.7 && < 5
 - text
+- mtl
+- aeson
+- bytestring
 - telegram-bot-simple
 
 library:
