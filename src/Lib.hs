@@ -42,7 +42,7 @@ updateToAction _ update =
                 Show logMessage helpMessage <$  command "start"
             <|> Show logMessage helpMessage <$  command "help"
             <|> QueryLog uId                <$  command "log"
-            <|> Show logMessage             <$> plainText
+            <|> Show logMessage pongMessage <$  command "ping"
     in parseUpdate parser update
 
 handleAction :: Action -> Model -> Eff Action Model
@@ -84,6 +84,11 @@ helpMessage = Text.unlines
 accessDeniedMessage :: Text
 accessDeniedMessage = Text.unlines
     [ "Доступ к логам разрешён только разработчикам бота."
+    ]
+
+pongMessage :: Text
+pongMessage = Text.unlines
+    [ "pong!"
     ]
 
 ownerId :: UserId
