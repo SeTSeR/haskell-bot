@@ -92,7 +92,7 @@ ownerId = UserId 205887307
 run :: Token -> IO ()
 run token = do
     env <- defaultTelegramClientEnv token
-    startBot_ (conversationBot updateChatId echoBot) env
+    startBot_ echoBot env
 
 start :: IO ()
 start = do
