@@ -26,6 +26,8 @@ dependencies:
 - aeson
 - bytestring
 - telegram-bot-simple
+- unordered-containers
+- hashable
 
 library:
   source-dirs: src
