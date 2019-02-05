@@ -14,13 +14,11 @@ helpMessage = Text.unlines
 
 accessDeniedMessage :: Text
 accessDeniedMessage = Text.unlines
-    [ "Доступ к логам разрешён только разработчикам бота."
-    ]
+    [ "Доступ к логам разрешён только разработчикам бота." ]
 
 pongMessage :: Text
 pongMessage = Text.unlines
-    [ "pong!"
-    ]
+    [ "pong!" ]
 
 accessMessage :: UserId -> Text
 accessMessage userId = Text.unwords
