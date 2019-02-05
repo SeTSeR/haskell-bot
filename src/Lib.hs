@@ -18,6 +18,8 @@ import Data.Hashable
 import           Data.HashMap.Strict   (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 
+import Data.Maybe
+
 import Telegram.Bot.API
 import Telegram.Bot.Simple
 import Telegram.Bot.Simple.UpdateParser
@@ -32,9 +34,9 @@ instance Hashable UserId where
 
 data Action
     = NoOp
-    | Start (Maybe UserId) (Maybe Chat)
+    | Start UserId Chat
     | Show Log Text
-    | QueryLog (Maybe UserId)
+    | QueryLog UserId ChatType
     deriving (Show)
 
 echoBot :: BotApp Model Action
@@ -49,12 +51,12 @@ updateToAction :: Model -> Update -> Maybe Action
 updateToAction _ update =
     let logMessage = decodeUtf8 . toStrict . Aeson.encode $ update
         uId = userId <$> (updateMessage update >>= messageFrom)
-        chat = messageChat <$> updateMessage update
+        chat = fromJust $ messageChat <$> updateMessage update
         parser = 
-                Start uId chat              <$  command "start"
-            <|> Show logMessage helpMessage <$  command "help"
-            <|> QueryLog uId                <$  command "log"
-            <|> Show logMessage pongMessage <$  command "ping"
+                Start (fromJust uId) chat                           <$  command "start"
+            <|> Show logMessage helpMessage                         <$  command "help"
+            <|> QueryLog (fromMaybe (UserId 0) uId) (chatType chat) <$  command "log"
+            <|> Show logMessage pongMessage                         <$  command "ping"
     in parseUpdate parser update
 
 handleAction :: Action -> Model -> Eff Action Model
@@ -63,15 +65,13 @@ handleAction action model =
             users <- model
             tell log
             tell $ Text.pack "\n"
-            tell $ Text.append (Text.pack "Reply:\n") message
             return users
         logmodel = botInitialModel echoBot
         incorrectusermodel userId = do
             users <- model
             tell $ accessMessage userId
             return users
-        updatedmodel (Just uid) (Just chat) = HashMap.insert uid chat <$> model
-        updatedmodel _ _ = model
+        updatedmodel uid chat = HashMap.insert uid chat <$> model
     in case action of
         NoOp -> pure model
         Start uid chat -> (updatedmodel uid chat) <# do
@@ -80,7 +80,7 @@ handleAction action model =
         Show log message -> (showmodel message log) <# do
             reply (toReplyMessage message)
             return NoOp
-        QueryLog (Just userId) -> if userId == ownerId
+        QueryLog userId ChatTypePrivate -> if userId == ownerId
             then
                 logmodel <# do
                     let msg = execWriter model
@@ -90,7 +90,9 @@ handleAction action model =
                 (incorrectusermodel userId) <# do
                     replyText accessDeniedMessage
                     return NoOp
-        QueryLog _ -> model <# return NoOp
+        QueryLog _ _ -> model <# do
+            replyText groupsDeniedMessage
+            return NoOp
 
 ownerId :: UserId
 ownerId = UserId 205887307

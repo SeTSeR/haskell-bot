@@ -26,3 +26,7 @@ accessMessage userId = Text.unwords
     , Text.pack . show $ userId
     , "has tried to access the logs.\n"
     ]
+
+groupsDeniedMessage :: Text
+groupsDeniedMessage = Text.unlines
+    [ "Запрос логов разрешён только из лички." ]
