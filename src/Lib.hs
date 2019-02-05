@@ -3,6 +3,8 @@ module Lib
     ( start
     ) where
 
+import Messages
+
 import Control.Applicative
 import Control.Monad.Writer
 import           Data.Text   (Text)
@@ -47,17 +49,15 @@ updateToAction _ update =
 
 handleAction :: Action -> Model -> Eff Action Model
 handleAction action model =
-    let showmodel message log = model >>
-            (tell log) >>
-            (tell $ Text.pack "\n") >>
-            (tell $ Text.append (Text.pack "Reply:\n") message)
-        logmodel = return ()
-        incorrectusermodel userId = model >>
-            (tell $ Text.unwords
-             [ "User with id"
-             , Text.pack . show $ userId
-             , "has tried to access logs.\n"
-             ])
+    let showmodel message log = do
+            _ <- model
+            tell log
+            tell $ Text.pack "\n"
+            tell $ Text.append (Text.pack "Reply:\n") message
+        logmodel = botInitialModel echoBot
+        incorrectusermodel userId = do
+            _ <- model
+            tell $ accessMessage userId
     in case action of
         NoOp -> pure model
         Show log message -> (showmodel message log) <# do
@@ -74,22 +74,6 @@ handleAction action model =
                     replyText accessDeniedMessage
                     return NoOp
         QueryLog _ -> model <# return NoOp
-
-helpMessage :: Text
-helpMessage = Text.unlines
-    [ "Привет, я @myhlbot, и пока я ничего не умею."
-    , "Можешь попробовать что-нибудь написать."
-    ]
-
-accessDeniedMessage :: Text
-accessDeniedMessage = Text.unlines
-    [ "Доступ к логам разрешён только разработчикам бота."
-    ]
-
-pongMessage :: Text
-pongMessage = Text.unlines
-    [ "pong!"
-    ]
 
 ownerId :: UserId
 ownerId = UserId 205887307
