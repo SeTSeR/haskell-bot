@@ -76,9 +76,9 @@ handleAction action model =
             tell $ accessMessage userId
             return chats
         updatedmodel uid chat = HashMap.insert uid chat <$> model
-        broadcast userId = do
+        broadcast userId message = do
             chats <- model
-            tell $ broadcastMessage userId
+            tell $ broadcastMessage userId message
             return chats
     in case action of
         NoOp -> pure model
@@ -91,8 +91,8 @@ handleAction action model =
         QueryLog userId ChatTypePrivate -> if userId == ownerId
             then
                 logmodel <# do
-                    let msg = execWriter model
-                    replyText msg
+                    let (chats, msg) = runWriter model
+                    replyText $ Text.append msg $ Text.pack . show $ chats
                     return NoOp
             else
                 (incorrectusermodel userId) <# do
@@ -102,13 +102,13 @@ handleAction action model =
             replyText groupsDeniedMessage
             return NoOp
         Broadcast userId message -> if userId == ownerId
-            then (broadcast userId) <# do
+            then (broadcast userId message) <# do
                 let (chats, _) = runWriter model
                     request chatId = defaultMessageRequest chatId message
-                liftClientM $ for_ chats $ \chat ->
+                liftClientM . for_ chats $ \chat ->
                     sendMessage . request . chatId $ chat
                 return NoOp
-            else (broadcast userId) <# do
+            else (broadcast userId message) <# do
                 replyText broadcastDeniedMessage
                 return NoOp
 

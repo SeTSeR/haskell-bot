@@ -16,11 +16,13 @@ accessDeniedMessage :: Text
 accessDeniedMessage = Text.unlines
     [ "Доступ к логам разрешён только администраторам бота." ]
 
-broadcastMessage :: UserId -> Text
-broadcastMessage userId = Text.unwords
+broadcastMessage :: UserId -> Text -> Text
+broadcastMessage userId message = Text.unwords
     [ "User with id"
     , Text.pack . show $ userId
-    , "has tried to broadcast.\n"
+    , "has tried to broadcast a message\n"
+    , message
+    , "\n"
     ]
 
 broadcastDeniedMessage :: Text
