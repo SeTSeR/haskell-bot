@@ -19,6 +19,7 @@ import           Data.HashMap.Strict   (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 
 import Data.Maybe
+import Data.Foldable
 
 import Telegram.Bot.API
 import Telegram.Bot.Simple
@@ -37,6 +38,7 @@ data Action
     | Start UserId Chat
     | Show Log Text
     | QueryLog UserId ChatType
+    | Broadcast UserId Text
     deriving (Show)
 
 echoBot :: BotApp Model Action
@@ -50,28 +52,34 @@ echoBot = BotApp
 updateToAction :: Model -> Update -> Maybe Action
 updateToAction _ update =
     let logMessage = decodeUtf8 . toStrict . Aeson.encode $ update
-        uId = userId <$> (updateMessage update >>= messageFrom)
+        uId = fromMaybe (UserId 0) . getUserId $ update
         chat = fromJust $ messageChat <$> updateMessage update
+        writeMessage = cropCommand . fromJust . updateMessageText $ update
         parser = 
-                Start (fromJust uId) chat                           <$  command "start"
-            <|> Show logMessage helpMessage                         <$  command "help"
-            <|> QueryLog (fromMaybe (UserId 0) uId) (chatType chat) <$  command "log"
-            <|> Show logMessage pongMessage                         <$  command "ping"
+                Start uId chat               <$  command "start"
+            <|> Show logMessage helpMessage  <$  command "help"
+            <|> QueryLog uId (chatType chat) <$  command "log"
+            <|> Show logMessage pongMessage  <$  command "ping"
+            <|> Broadcast uId writeMessage   <$  command "broadcast"
     in parseUpdate parser update
 
 handleAction :: Action -> Model -> Eff Action Model
 handleAction action model =
     let showmodel message log = do
-            users <- model
+            chats <- model
             tell log
             tell $ Text.pack "\n"
-            return users
+            return chats
         logmodel = botInitialModel echoBot
         incorrectusermodel userId = do
-            users <- model
+            chats <- model
             tell $ accessMessage userId
-            return users
+            return chats
         updatedmodel uid chat = HashMap.insert uid chat <$> model
+        broadcast userId = do
+            chats <- model
+            tell $ broadcastMessage userId
+            return chats
     in case action of
         NoOp -> pure model
         Start uid chat -> (updatedmodel uid chat) <# do
@@ -93,9 +101,28 @@ handleAction action model =
         QueryLog _ _ -> model <# do
             replyText groupsDeniedMessage
             return NoOp
+        Broadcast userId message -> if userId == ownerId
+            then (broadcast userId) <# do
+                let (chats, _) = runWriter model
+                    request chatId = defaultMessageRequest chatId message
+                liftClientM $ for_ chats $ \chat ->
+                    sendMessage . request . chatId $ chat
+                return NoOp
+            else (broadcast userId) <# do
+                replyText broadcastDeniedMessage
+                return NoOp
 
+cropCommand :: Text -> Text
+cropCommand = Text.unwords . tail . Text.words
+
+getUserId :: Update -> Maybe UserId
+getUserId update = userId <$> (updateMessage update >>= messageFrom)
+            
 ownerId :: UserId
 ownerId = UserId 205887307
+
+defaultMessageRequest :: ChatId -> Text -> SendMessageRequest
+defaultMessageRequest id msg = SendMessageRequest (SomeChatId id) msg Nothing Nothing Nothing Nothing Nothing
 
 run :: Token -> IO ()
 run token = do

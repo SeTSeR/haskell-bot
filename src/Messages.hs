@@ -14,7 +14,18 @@ helpMessage = Text.unlines
 
 accessDeniedMessage :: Text
 accessDeniedMessage = Text.unlines
-    [ "Доступ к логам разрешён только разработчикам бота." ]
+    [ "Доступ к логам разрешён только администраторам бота." ]
+
+broadcastMessage :: UserId -> Text
+broadcastMessage userId = Text.unwords
+    [ "User with id"
+    , Text.pack . show $ userId
+    , "has tried to broadcast.\n"
+    ]
+
+broadcastDeniedMessage :: Text
+broadcastDeniedMessage = Text.unlines
+    [ "Рассылка разрешена только администраторам бота." ]
 
 pongMessage :: Text
 pongMessage = Text.unlines
