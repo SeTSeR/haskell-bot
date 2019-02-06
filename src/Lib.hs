@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BangPatterns #-}
 module Lib
     ( start
     ) where
@@ -7,6 +8,7 @@ import Messages
 
 import Control.Applicative
 import Control.Monad.Writer
+
 import           Data.Text   (Text)
 import qualified Data.Text as Text
 
@@ -39,6 +41,8 @@ data Action
     | Show Log Text
     | QueryLog UserId ChatType
     | Broadcast UserId Text
+    | Write Username Text
+    | WriteToLog Text
     deriving (Show)
 
 echoBot :: BotApp Model Action
@@ -54,13 +58,17 @@ updateToAction _ update =
     let logMessage = decodeUtf8 . toStrict . Aeson.encode $ update
         uId = fromMaybe (UserId 0) . getUserId $ update
         chat = fromJust $ messageChat <$> updateMessage update
-        writeMessage = cropCommand . fromJust . updateMessageText $ update
+        broadcastMessage = cropFirstWord . fromJust . updateMessageText $ update
+        croppedMessage = cropFirstWord . fromJust . updateMessageText $ update
+        username = head . Text.words $ croppedMessage
+        writeMessage = cropFirstWord croppedMessage
         parser = 
-                Start uId chat               <$  command "start"
-            <|> Show logMessage helpMessage  <$  command "help"
-            <|> QueryLog uId (chatType chat) <$  command "log"
-            <|> Show logMessage pongMessage  <$  command "ping"
-            <|> Broadcast uId writeMessage   <$  command "broadcast"
+                Start uId chat                 <$  command "start"
+            <|> Show logMessage helpMessage    <$  command "help"
+            <|> QueryLog uId (chatType chat)   <$  command "log"
+            <|> Show logMessage pongMessage    <$  command "ping"
+            <|> Broadcast uId broadcastMessage <$  command "broadcast"
+            <|> Write username writeMessage    <$  command "write"
     in parseUpdate parser update
 
 handleAction :: Action -> Model -> Eff Action Model
@@ -79,6 +87,10 @@ handleAction action model =
         broadcast userId message = do
             chats <- model
             tell $ broadcastMessage userId message
+            return chats
+        writetologmodel message = do
+            chats <- model
+            tell $ Text.cons '\n' message
             return chats
     in case action of
         NoOp -> pure model
@@ -111,9 +123,14 @@ handleAction action model =
             else (broadcast userId message) <# do
                 replyText broadcastDeniedMessage
                 return NoOp
+        Write username message -> model <# do
+            let request = SendMessageRequest (SomeChatUsername username) message Nothing Nothing Nothing Nothing Nothing
+            response <- liftClientM . sendMessage $ request
+            return . WriteToLog . Text.pack . show $ response
+        WriteToLog message -> (writetologmodel message) <# return NoOp
 
-cropCommand :: Text -> Text
-cropCommand = Text.unwords . tail . Text.words
+cropFirstWord :: Text -> Text
+cropFirstWord = Text.unwords . tail . Text.words
 
 getUserId :: Update -> Maybe UserId
 getUserId update = userId <$> (updateMessage update >>= messageFrom)
