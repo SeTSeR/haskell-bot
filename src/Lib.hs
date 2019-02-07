@@ -110,7 +110,7 @@ handleQuery :: UserId -> ChatType -> Model -> Eff Action Model
 handleQuery userId ChatTypePrivate model | userId == ownerId = newmodel <# replyLogAction
                                          | otherwise = accessdeniedmodel <# denyAccessAction
     where
-        newmodel = botInitialModel echoBot
+        newmodel = censor (\_ -> "") model
         accessdeniedmodel = do
             chats <- model
             tell $ accessMessage userId
