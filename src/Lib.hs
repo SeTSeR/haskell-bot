@@ -73,61 +73,85 @@ updateToAction _ update =
 
 handleAction :: Action -> Model -> Eff Action Model
 handleAction action model =
-    let showmodel message log = do
-            chats <- model
-            tell log
-            tell $ Text.pack "\n"
-            return chats
-        logmodel = botInitialModel echoBot
-        incorrectusermodel userId = do
-            chats <- model
-            tell $ accessMessage userId
-            return chats
-        updatedmodel uid chat = HashMap.insert uid chat <$> model
-        broadcast userId message = do
-            chats <- model
-            tell $ broadcastMessage userId message
-            return chats
-        writetologmodel message = do
+    let writetologmodel message = do
             chats <- model
             tell $ Text.cons '\n' message
             return chats
     in case action of
         NoOp -> pure model
-        Start uid chat -> (updatedmodel uid chat) <# do
+        Start uid chat -> handleStart uid chat model
+        Show log message -> handleShow log message model
+        QueryLog userId chatType -> handleQuery userId chatType model
+        Broadcast userId message -> handleBroadcast userId message model
+        Write username message -> handleWrite username message model
+        WriteToLog message -> (writetologmodel message) <# return NoOp
+
+handleStart :: UserId -> Chat -> Model -> Eff Action Model
+handleStart userId chat model = newmodel <# action
+    where
+        newmodel = HashMap.insert userId chat <$> model
+        action = do
             replyText helpMessage
             return NoOp
-        Show log message -> (showmodel message log) <# do
+
+handleShow :: Log -> Text -> Model -> Eff Action Model
+handleShow log message model = newmodel <# action
+    where
+        newmodel = do
+            chats <- model
+            tell log
+            tell $ Text.pack "\n"
+            return chats
+        action = do
             reply (toReplyMessage message)
             return NoOp
-        QueryLog userId ChatTypePrivate -> if userId == ownerId
-            then
-                logmodel <# do
-                    let (chats, msg) = runWriter model
-                    replyText $ Text.append msg $ Text.pack . show $ chats
-                    return NoOp
-            else
-                (incorrectusermodel userId) <# do
-                    replyText accessDeniedMessage
-                    return NoOp
-        QueryLog _ _ -> model <# do
+
+handleQuery :: UserId -> ChatType -> Model -> Eff Action Model
+handleQuery userId ChatTypePrivate model | userId == ownerId = newmodel <# replyLogAction
+                                         | otherwise = accessdeniedmodel <# denyAccessAction
+    where
+        newmodel = botInitialModel echoBot
+        accessdeniedmodel = do
+            chats <- model
+            tell $ accessMessage userId
+            return chats
+        replyLogAction = do 
+            let (chats, msg) = runWriter model
+            replyText $ Text.append msg $ Text.pack . show $ chats
+            return NoOp
+        denyAccessAction = do
+            replyText accessDeniedMessage
+            return NoOp    
+handleQuery _      _               model = model <# groupsDenyAction
+    where
+        groupsDenyAction = do
             replyText groupsDeniedMessage
             return NoOp
-        Broadcast userId message -> if userId == ownerId
-            then (broadcast userId message) <# do
-                let (chats, _) = runWriter model
-                    request chatId = defaultMessageRequest chatId message
-                liftClientM . for_ chats $ \chat ->
-                    sendMessage . request . chatId $ chat
-                return NoOp
-            else (broadcast userId message) <# do
-                replyText broadcastDeniedMessage
-                return NoOp
-        Write username message -> model <# do
-            let request = SendMessageRequest (SomeChatUsername username) message Nothing Nothing Nothing Nothing Nothing
-            response <- liftClientM . sendMessage $ request
-            return . WriteToLog . Text.pack . show $ response
-        WriteToLog message -> (writetologmodel message) <# return NoOp
+
+handleWrite :: Username -> Text -> Model -> Eff Action Model
+handleWrite username message model = model <# do
+    let request = SendMessageRequest (SomeChatUsername username) message Nothing Nothing Nothing Nothing Nothing
+    response <- liftClientM . sendMessage $ request
+    return . WriteToLog . Text.pack . show $ response
+
+handleBroadcast :: UserId -> Text -> Model -> Eff Action Model
+handleBroadcast userId message model = newmodel <# action
+    where
+        newmodel = do
+            chats <- model
+            tell $ broadcastMessage userId message
+            return chats
+        action = do
+            if userId == ownerId
+                then do
+                    let (chats, _) = runWriter model
+                        request chatId = defaultMessageRequest chatId message
+                    liftClientM . for_ chats $ \chat ->
+                        sendMessage . request . chatId $ chat
+                    return NoOp
+                else do
+                    replyText broadcastDeniedMessage
+                    return NoOp
 
 cropFirstWord :: Text -> Text
 cropFirstWord = Text.unwords . tail . Text.words
