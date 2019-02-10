@@ -30,6 +30,7 @@ dependencies:
 - hashable
 - servant
 - servant-client
+- http-client
 
 library:
   source-dirs: src
