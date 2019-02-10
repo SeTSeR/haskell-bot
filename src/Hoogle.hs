@@ -8,13 +8,13 @@ where
 
 import Data.Aeson (FromJSON)
 import Data.Text (Text)
+import Data.Proxy
 import GHC.Generics
+import Network.HTTP.Client (newManager, defaultManagerSettings)
 import Servant.API
 import Servant.Client
 
-type HoogleAPI = "hoogle" :> QueryParam "mode" Json :> Capture "hoogle" String :> Get '[JSON] Answer
-
-data Json = Json
+type HoogleAPI = "hoogle" :> QueryParam "mode" String :> QueryParam "hoogle" String :> Get '[JSON] Answer
 
 data Answer = Answer
     { results :: [Result]
@@ -29,8 +29,11 @@ data Result = Result
     } deriving (Show, Generic)
 instance FromJSON Result
 
-hoogle :: String -> ClientM Answer
-hoogle = undefined
+api :: Proxy HoogleAPI
+api = Proxy
+
+hoogle :: Maybe String -> Maybe String -> ClientM Answer
+hoogle = client api
 
 search :: Text -> [Text]
 search = undefined
