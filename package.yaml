@@ -28,6 +28,8 @@ dependencies:
 - telegram-bot-simple
 - unordered-containers
 - hashable
+- servant
+- servant-client
 
 library:
   source-dirs: src
