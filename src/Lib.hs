@@ -4,6 +4,7 @@ module Lib
     ( start
     ) where
 
+import Hoogle
 import Messages
 
 import Control.Applicative
@@ -43,6 +44,7 @@ data Action
     | Broadcast UserId Text
     | Write Username Text
     | WriteToLog Text
+    | Hoogle Int Text
     deriving (Show)
 
 echoBot :: BotApp Model Action
@@ -61,6 +63,7 @@ updateToAction _ update =
         broadcastMessage = cropFirstWord . fromJust . updateMessageText $ update
         croppedMessage = cropFirstWord . fromJust . updateMessageText $ update
         username = head . Text.words $ croppedMessage
+        count = (read . Text.unpack $ username) :: Int
         writeMessage = cropFirstWord croppedMessage
         parser = 
                 Start uId chat                 <$  command "start"
@@ -69,6 +72,7 @@ updateToAction _ update =
             <|> Show logMessage pongMessage    <$  command "ping"
             <|> Broadcast uId broadcastMessage <$  command "broadcast"
             <|> Write username writeMessage    <$  command "write"
+            <|> Hoogle count writeMessage      <$  command "hoogle"
     in parseUpdate parser update
 
 handleAction :: Action -> Model -> Eff Action Model
@@ -85,6 +89,7 @@ handleAction action model =
         Broadcast userId message -> handleBroadcast userId message model
         Write username message -> handleWrite username message model
         WriteToLog message -> (writetologmodel message) <# return NoOp
+        Hoogle count query -> handleHoogle count query model
 
 handleStart :: UserId -> Chat -> Model -> Eff Action Model
 handleStart userId chat model = newmodel <# action
@@ -153,6 +158,27 @@ handleBroadcast userId message model = newmodel <# action
                     replyText broadcastDeniedMessage
                     return NoOp
 
+handleHoogle :: Int -> Text -> Model -> Eff Action Model
+handleHoogle count query model = newmodel <# action
+    where
+        newmodel = do
+            chats <- model
+            tell $ Text.pack "Hoogle search: "
+            tell query
+            tell "\n"
+            return chats
+        action = do
+            res <- liftIO $ search query count
+            case res of
+                Left err -> do
+                    replyText hoogleFailMessage
+                    return $ WriteToLog err
+                Right results -> do
+                    let messages = map printResult results
+                    replyText $ Text.pack $ "Showing " ++ (show count) ++ " results."
+                    mapM_ replyText messages
+                    return $ WriteToLog $ Text.unlines messages
+
 cropFirstWord :: Text -> Text
 cropFirstWord = Text.unwords . tail . Text.words
 
@@ -164,6 +190,13 @@ ownerId = UserId 205887307
 
 defaultMessageRequest :: ChatId -> Text -> SendMessageRequest
 defaultMessageRequest id msg = SendMessageRequest (SomeChatId id) msg Nothing Nothing Nothing Nothing Nothing
+
+printResult :: Result -> Text
+printResult result = Text.unlines . map Text.pack $
+    [ self result
+    , docs result
+    , location result
+    ]
 
 run :: Token -> IO ()
 run token = do

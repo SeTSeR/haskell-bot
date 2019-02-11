@@ -43,3 +43,7 @@ accessMessage userId = Text.unwords
 groupsDeniedMessage :: Text
 groupsDeniedMessage = Text.unlines
     [ "Запрос логов разрешён только из лички." ]
+
+hoogleFailMessage :: Text
+hoogleFailMessage = Text.unlines
+    [ "Ошибка поиска." ]
