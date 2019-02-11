@@ -8,8 +8,8 @@ import Telegram.Bot.API.Types(UserId)
 
 helpMessage :: Text
 helpMessage = Text.unlines
-    [ "Привет, я @myhlbot, и пока я ничего не умею."
-    , "Можешь попробовать что-нибудь написать."
+    [ "Привет, я @myhlbot, и пока умею только одну команду."
+    , "/hoogle count query - вывести count результатов поиска в hoogle по запросу query."
     ]
 
 accessDeniedMessage :: Text
