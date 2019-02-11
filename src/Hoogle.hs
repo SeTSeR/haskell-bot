@@ -3,14 +3,19 @@
 {-# LANGUAGE TypeOperators #-}
 
 module Hoogle
-    ( search )
+    ( search
+    , Result
+    )
 where
 
+import           Data.Text   (Text)
+import qualified Data.Text as Text
+
 import Data.Aeson (FromJSON)
-import Data.Text (Text)
 import Data.Proxy
 import GHC.Generics
 import Network.HTTP.Client (newManager, defaultManagerSettings)
+import Network.HTTP.Client.TLS (tlsManagerSettings)
 import Servant.API
 import Servant.Client
 
@@ -35,5 +40,5 @@ api = Proxy
 hoogle :: Maybe String -> Maybe String -> ClientM Answer
 hoogle = client api
 
-search :: Text -> [Text]
-search = undefined
+search :: Text -> ClientM [Result]
+search query = results <$> (hoogle (Just "json") . Just . Text.unpack $ query)
