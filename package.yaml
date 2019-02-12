@@ -30,8 +30,10 @@ dependencies:
 - hashable
 - servant
 - servant-client
+- servant-JuicyPixels
 - http-client
 - http-client-tls
+- JuicyPixels
 
 library:
   source-dirs: src

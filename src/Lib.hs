@@ -6,8 +6,10 @@ module Lib
 
 import Hoogle
 import Messages
+import Wolfram
 
 import Control.Applicative
+import Control.Monad.Reader
 import Control.Monad.Writer
 
 import           Data.Text   (Text)
@@ -45,10 +47,11 @@ data Action
     | Write Username Text
     | WriteToLog Text
     | Hoogle Int Text
+    | Wolfram Text
     deriving (Show)
 
-echoBot :: BotApp Model Action
-echoBot = BotApp 
+haskellBot :: BotApp Model Action
+haskellBot = BotApp 
     { botInitialModel = return HashMap.empty
     , botAction = flip updateToAction
     , botHandler = handleAction
@@ -73,6 +76,8 @@ updateToAction _ update =
             <|> Broadcast uId broadcastMessage <$  command "broadcast"
             <|> Write username writeMessage    <$  command "write"
             <|> Hoogle count writeMessage      <$  command "hoogle"
+            <|> Wolfram croppedMessage         <$  command "wolfram"
+            <|> Wolfram croppedMessage         <$  command "wf"
     in parseUpdate parser update
 
 handleAction :: Action -> Model -> Eff Action Model
@@ -90,6 +95,7 @@ handleAction action model =
         Write username message -> handleWrite username message model
         WriteToLog message -> (writetologmodel message) <# return NoOp
         Hoogle count query -> handleHoogle count query model
+        Wolfram query -> handleWolfram query model
 
 handleStart :: UserId -> Chat -> Model -> Eff Action Model
 handleStart userId chat model = newmodel <# action
@@ -179,6 +185,25 @@ handleHoogle count query model = newmodel <# action
                     mapM_ replyText messages
                     return $ WriteToLog $ Text.unlines messages
 
+handleWolfram :: Text -> Model -> Eff Action Model
+handleWolfram query model = newmodel <# action
+    where
+        newmodel = do
+            chats <- model
+            tell $ Text.pack "Wolfram search: "
+            tell query
+            tell "\n"
+            return chats
+        action = do
+            url <- liftIO . wolfram $ query
+            chatId <- currentChatId
+            case chatId of
+                Just chatId -> do
+                    let request = formSendDocumentRequest chatId (Text.pack url)
+                    response <- liftClientM . sendDocument $ request
+                    return $ WriteToLog . Text.pack . show $ response
+                _ -> return $ WriteToLog . Text.pack $ "Failed to find current chat\n"
+
 cropFirstWord :: Text -> Text
 cropFirstWord = Text.unwords . tail . Text.words
 
@@ -187,6 +212,9 @@ getUserId update = userId <$> (updateMessage update >>= messageFrom)
             
 ownerId :: UserId
 ownerId = UserId 205887307
+
+formSendDocumentRequest :: ChatId -> Text -> SendDocumentRequest
+formSendDocumentRequest id doc = SendDocumentRequest (SomeChatId id) doc Nothing Nothing Nothing Nothing Nothing
 
 defaultMessageRequest :: ChatId -> Text -> SendMessageRequest
 defaultMessageRequest id msg = SendMessageRequest (SomeChatId id) msg Nothing Nothing Nothing Nothing Nothing
@@ -201,7 +229,7 @@ printResult result = Text.unlines . map Text.pack $
 run :: Token -> IO ()
 run token = do
     env <- defaultTelegramClientEnv token
-    startBot_ echoBot env
+    startBot_ haskellBot env
 
 start :: IO ()
 start = do
