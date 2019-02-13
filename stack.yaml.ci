@@ -38,8 +38,10 @@ packages:
 # Dependency packages to be pulled from upstream that are not in the resolver
 # using the same syntax as the packages field.
 # (e.g., acme-missiles-0.3)
-# extra-deps: []
-
+extra-deps:
+- github: SeTSeR/telegram-bot-simple
+  commit: f5a622bbb8237f29e4945c5a374340e8ffff8013
+  
 # Override default flag values for local packages and extra-deps
 # flags: {}
 
