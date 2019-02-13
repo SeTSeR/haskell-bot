@@ -28,7 +28,7 @@ token :: IO String
 token = getEnv "WOLFRAM_TOKEN"
 
 fontsize :: Int
-fontsize = 18
+fontsize = 14
 
 layout :: String
 layout = "divider"
